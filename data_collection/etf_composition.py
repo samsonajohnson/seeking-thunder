@@ -1,10 +1,147 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+import datetime as dt
+import requests
+import yfinance as yf
+from time import sleep
+import json
+import difflib
+import re
+import bisect
+import glob
+
+import bs4
+from bs4 import BeautifulSoup
+
+sns.set_style('darkgrid')
+
+from api_keys import sec_email
+
+headers = {"User-Agent": sec_email} # Your email goes here
 
 
-def get_edgar_form(form_name, date):
-    return None
+def NPORT_Filings_from_CIK(cik, headers=headers):
+    headers = headers
+    url = f"https://data.sec.gov/submissions/CIK{cik}.json"
+    sleep(2)
+    filings = requests.get(url, headers=headers).json()
+    filings_df = pd.DataFrame(filings["filings"]["recent"])
+    nport_filings_df = filings_df[filings_df["form"] == "NPORT-P"]
+    nport_filings_df.loc[:,'filingDate'] = pd.to_datetime(nport_filings_df['filingDate'])
+    nport_filings_df.loc[:,'reportDate'] = pd.to_datetime(nport_filings_df['reportDate'])
+    return nport_filings_df
+
+
+def gen_company_name_and_cik_list(headers=headers):
+    headers = headers
+    url = "https://www.sec.gov/Archives/edgar/cik-lookup-data.txt"
+    sleep(2)
+    response = requests.get(url, headers=headers)
+    # filings_df = pd.DataFrame(filings)
+    return response.text.split('\n')
+
+
+# cik_list = gen_company_name_and_cik_list()
+
+
+def holdings_from_NPORT(accessionNumber, primaryDocument, reportDate, cik_list, headers=headers):
+  
+    sleep(2)
+
+    url = f"https://www.sec.gov/Archives/edgar/data/1064641/{accessionNumber}/{primaryDocument}"
+    
+    response = requests.get(url, headers=headers)
+
+    assert response.status_code == 200
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    stocks_source = soup.findAll("td",string='a. Name of issuer (if any). \n\t\t\t\t')
+    CUSIPs_source = soup.findAll("td",string='d. CUSIP (if any).\n\t\t\t\t')
+    weights_source = soup.findAll('td',string='Percentage value compared to net assets of the Fund.\n\t\t\t')
+
+    stocks = [stock.parent.find('div').contents[0] for stock in stocks_source]
+    CUSIPs = [CUSIP.parent.find('div').contents[0] for CUSIP in CUSIPs_source]
+    weights = [weight.parent.find('div').contents[0] for weight in weights_source]
+    CIKs = []
+
+    for stock in stocks:
+        index = bisect.bisect_left(cik_list, stock.upper())
+        CIKs.append(cik_list[index].split(":")[1])
+
+    holdings = pd.DataFrame({'Stock': stocks, 'CIK': CIKs, 'Weight': weights})
+    
+    elem = soup.findAll('td',string="Series ID")[0]
+    
+    seriesID = elem.parent.parent.div.contents[0]
+    
+    return seriesID, holdings
+
+
+def load_ticker_cik(path='./data/'):
+    """
+    A function to read in the CIK lookup json from SEC website ADD URL
+    """  
+    # file should be stored in ./data/, but could possibly change
+    with open(path+'company_ticker.json', 'r') as fh:
+        new_json = json.load(fh)
+    # need to transpose, just formatting I think
+    tbl = pd.DataFrame.from_dict(new_json).T
+    return tbl
+
+
+def find_ticker(holding_dict, lookup_tbl):
+    # empty list to store tickers
+    tickers = []
+    # loop over every row in the dataframe
+    for index, row in holding_dict.iterrows():
+        # first try and find CIK
+        # print("STOCK  ", row['CIK'])
+        if int(row['CIK']) in lookup_tbl['cik_str'].values:
+            ticker = lookup_tbl[lookup_tbl['cik_str'] == int(row['CIK'])]['ticker'].values[0]
+            tickers.append(ticker)
+        else:
+            # this is a quick sequence matcher. It finds the closest match and uses that as the ticker. 
+            # PROBABLY A BETTER WAY TO LOOK THIS UP
+            max_row = lookup_tbl.iloc[lookup_tbl.apply(lambda x: difflib.SequenceMatcher(None, row['Stock'].lower(), x['title'].lower()).ratio(),axis=1).argmax()]
+            ticker = max_row['ticker']
+            tickers.append(ticker)
+    return tickers
+
+
+def load_etf_comps():
+    """
+    Method to read in ALL the nport files from the data directory
+    """
+    file_list = glob.glob('data/S*')
+    master_dict = {}
+    for file_name in file_list:
+        accession_key = file_name.split('/')[-1].split('_')[0]
+        if accession_key not in master_dict.keys():
+            master_dict[accession_key] = {}
+        date = file_name.split('/')[-1].split('_')[1].split('.')[0]
+        df_temp = pd.read_pickle(file_name)
+        master_dict[accession_key][date] = df_temp
+    return master_dict
 
 
 if __name__ == '__main__':
-    x = np.arange(10)
-    print("test")
+
+    #run to generate new save files
+    filings = NPORT_Filings_from_CIK('0001064641')
+
+    SPDR_holdings = {}
+
+    for i in range(len(filings)):
+        accessionNumber = filings["accessionNumber"].iloc[i].replace("-","")
+        primaryDocument = filings["primaryDocument"].iloc[i]
+        reportDate = filings["reportDate"].iloc[i]
+
+        seriesID, holdings = holdings_from_NPORT(accessionNumber,primaryDocument,reportDate,headers=headers)
+
+        if seriesID in SPDR_holdings:
+            SPDR_holdings[seriesID].merge(holdings,how='outer')
+        else:
+            SPDR_holdings[seriesID] = holdings
