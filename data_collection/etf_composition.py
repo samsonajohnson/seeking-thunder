@@ -14,7 +14,7 @@ import glob
 
 import bs4
 from bs4 import BeautifulSoup
-
+#import ipdb
 sns.set_style('darkgrid')
 
 from api_keys import sec_email
@@ -62,21 +62,36 @@ def holdings_from_NPORT(accessionNumber, primaryDocument, reportDate, cik_list, 
     CUSIPs_source = soup.findAll("td",string='d. CUSIP (if any).\n\t\t\t\t')
     weights_source = soup.findAll('td',string='Percentage value compared to net assets of the Fund.\n\t\t\t')
 
-    stocks = [stock.parent.find('div').contents[0] for stock in stocks_source]
-    CUSIPs = [CUSIP.parent.find('div').contents[0] for CUSIP in CUSIPs_source]
-    weights = [weight.parent.find('div').contents[0] for weight in weights_source]
+    stocks = [str(stock.parent.find('div').contents[0]) for stock in stocks_source]
+    CUSIPs = [str(CUSIP.parent.find('div').contents[0]) for CUSIP in CUSIPs_source]
+    weights = [float(weight.parent.find('div').contents[0]) for weight in weights_source]
     CIKs = []
 
     for stock in stocks:
         index = bisect.bisect_left(cik_list, stock.upper())
         CIKs.append(cik_list[index].split(":")[1])
 
-    holdings = pd.DataFrame({'Stock': stocks, 'CIK': CIKs, 'Weight': weights})
+    date_str = reportDate.strftime('%Y%m%d')
     
+    holdings = pd.DataFrame({'Stock': stocks, 'CIK': CIKs, date_str: weights})
+
+    # there are some duplicate CIKs within the holdings dataframe. This comes from the fact that
+    # some shares for the same company are different. E.g., GOOG carries voting rights while
+    # GOOGL does not, but they have the same CIK.
+    # I am treating all dupplicate CIKs as the same for now, which is not the correct way to go
+    # about this. Different share classes can have significantly different prices, but there I could not
+    # find a robust mapping to identify the different share classes.
+    # Look into PERMNO, ISIN
+    
+    aggregate_functions = {'Stock':'first',date_str:'sum'}
+    holdings = holdings.groupby(holdings['CIK'],as_index=False).aggregate(aggregate_functions)
+    #tickers = find_ticker(holdings,load_ticker_cik(path="../data/"))
+
+    #holdings.insert(1,"Tickers",tickers)
     elem = soup.findAll('td',string="Series ID")[0]
     
-    seriesID = elem.parent.parent.div.contents[0]
-    
+    seriesID = str(elem.parent.parent.div.contents[0])
+
     return seriesID, holdings
 
 
@@ -89,6 +104,7 @@ def load_ticker_cik(path='./data/'):
         new_json = json.load(fh)
     # need to transpose, just formatting I think
     tbl = pd.DataFrame.from_dict(new_json).T
+    
     return tbl
 
 
@@ -128,10 +144,10 @@ def load_etf_comps():
 
 
 if __name__ == '__main__':
-
+    #ipdb.set_trace()
     #run to generate new save files
     filings = NPORT_Filings_from_CIK('0001064641')
-
+    cik_list = gen_company_name_and_cik_list()
     SPDR_holdings = {}
 
     for i in range(len(filings)):
@@ -139,9 +155,18 @@ if __name__ == '__main__':
         primaryDocument = filings["primaryDocument"].iloc[i]
         reportDate = filings["reportDate"].iloc[i]
 
-        seriesID, holdings = holdings_from_NPORT(accessionNumber,primaryDocument,reportDate,headers=headers)
-
+        seriesID, holdings = holdings_from_NPORT(accessionNumber,primaryDocument,reportDate,cik_list,headers=headers)
+        
         if seriesID in SPDR_holdings:
-            SPDR_holdings[seriesID].merge(holdings,how='outer')
+            SPDR_holdings[seriesID] = SPDR_holdings[seriesID].merge(holdings,how='outer').fillna(0)
+            
         else:
             SPDR_holdings[seriesID] = holdings
+
+    lookup_tbl = load_ticker_cik(path='../data/')
+    
+    for i,seriesID in enumerate(SPDR_holdings.keys()):
+        # for each seriesID, find the ticker values
+        tickers = find_ticker(SPDR_holdings[seriesID], lookup_tbl)
+        SPDR_holdings[seriesID].insert(1,"Tickers",tickers)
+        SPDR_holdings[seriesID].to_csv(f"../data/{seriesID}.csv")
