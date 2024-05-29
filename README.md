@@ -1,3 +1,16 @@
+# Seeking Thunder
+B.  Baharinezhad, S. Johnson, M. LaCroix, A. Patil, J. Pfeffer, 
+
+## Introduction
+
+Exchange Traded Funds ([ETFs](https://www.investopedia.com/terms/e/etf.asp)) are investment instruments that pool several securities into one. ETFs typically group stocks of a common theme and increase correlations between stock prices, even for "outsider" stocks contained in the ETF that have *little or negative exposure* to the theme. If outsider stocks exhibit unjustified, sympathic price movements due to this correlation with other stocks in the ETF, one would expect their precies to revert to nominal values. This produces a trading opportunity that can be capitalized upon. This behavior was pointed out by [Lynch et al. 2019](https://www.tandfonline.com/doi/full/10.1080/0015198X.2019.1572358), and here we investigate and extend their findings. 
+
+## Data
+
+We examine ten(?) ETFs from the [Select Sector SPDR Trust](https://www.sectorspdrs.com/) which contain broad themes ranging from health care to entertainment. We gather data for each of these from their NPORT-P filings from the [SEC EDGARS](https://www.sec.gov/edgar/search-and-access) database. These NPORT-P filings contain the quartly reporting of the relative composition of the ETF, as the ETF can change its make-up by rebalancing the amount the fund holds of each individual consitituent stock on a quarterly basis. Each of these ETFs contain an average (median) of ~60 (~45) individual tickers. These composition and weights are stored in the data directory (e.g., [XLV](data/S000006408.csv)). These data were produced by running [etf_composition.py](data_collection/etf_composition.py), which took roughly 10 minutes. 
+
+Once we have obtained the composition of the ETFs, we then retrieve the daily [open, high, low, close] prices of the stocks within the ETF. We obtain these using the Python API [yfinance](https://pypi.org/project/yfinance/) for querying [Yahoo! Finances](https://finance.yahoo.com/) stock price records. 
+
 # seeking-thunder
 
 placeholder to stick some content in the readme
