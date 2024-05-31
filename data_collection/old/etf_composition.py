@@ -117,14 +117,13 @@ def find_ticker(holding_dict, lookup_tbl):
         # print("STOCK  ", row['CIK'])
         if int(row['CIK']) in lookup_tbl['cik_str'].values:
             ticker = lookup_tbl[lookup_tbl['cik_str'] == int(row['CIK'])]['ticker'].values[0]
+            tickers.append(ticker)
         else:
             # this is a quick sequence matcher. It finds the closest match and uses that as the ticker. 
             # PROBABLY A BETTER WAY TO LOOK THIS UP
             max_row = lookup_tbl.iloc[lookup_tbl.apply(lambda x: difflib.SequenceMatcher(None, row['Stock'].lower(), x['title'].lower()).ratio(),axis=1).argmax()]
             ticker = max_row['ticker']
-        if ticker == 'MAAI':
-            ticker == 'MAA' # This is a messy quick fix for a bug in our code that affects one particular stock ticker
-        tickers.append(ticker)
+            tickers.append(ticker)
     return tickers
 
 
@@ -148,21 +147,6 @@ if __name__ == '__main__':
     #ipdb.set_trace()
     #run to generate new save files
     filings = NPORT_Filings_from_CIK('0001064641')
-    
-    seriesID_to_ticker_dict = {
-    'S000006408': 'XLY',
-    'S000006409': 'XLP',
-    'S000006410': 'XLE',
-    'S000006411': 'XLF',
-    'S000006412': 'XLV',
-    'S000006413': 'XLI',
-    'S000006414': 'XLB',
-    'S000006415': 'XLK',
-    'S000006416': 'XLU',
-    'S000051152': 'XLRE',
-    'S000062095': 'XLC'
-}
-    
     cik_list = gen_company_name_and_cik_list()
     SPDR_holdings = {}
 
@@ -185,4 +169,4 @@ if __name__ == '__main__':
         # for each seriesID, find the ticker values
         tickers = find_ticker(SPDR_holdings[seriesID], lookup_tbl)
         SPDR_holdings[seriesID].insert(1,"Tickers",tickers)
-        SPDR_holdings[seriesID].to_csv(f"../data/{seriesID_to_ticker_dict[seriesID]}_holdings.csv")
+        SPDR_holdings[seriesID].to_csv(f"../data/{seriesID}.csv")

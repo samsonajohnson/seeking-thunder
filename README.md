@@ -21,7 +21,8 @@ To quantify the correlation between the returns of the individual stocks and for
 
 
 
-# seeking-thunder
+<!--# seeking-thunder
+ 
 
 placeholder to stick some content in the readme
 
@@ -32,3 +33,4 @@ This currently leaves us with two ideas to explore:
 
 
 A challenge that Mike pointed out is that it is paramount to have access to the right data (and enough of it) to do the data science we want. This might be particularly challenging with Samson's idea if we cannot access the per-minute stock trading data that we need.  So Mike suggested that we investigate what data we can actually access to explore problems (1) and (2) above before deciding which problem to tackle.  So our objective going forward is to look into what data we can get for these two problems in the next couple of days and go from there.
+-->
