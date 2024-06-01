@@ -1,4 +1,10 @@
-# Seeking Thunder
+# Repo Guide
+- This [beta values script]([url](https://github.com/mjplacroix/seeking-thunder/blob/main/beta_values.py)) walks through calculating the beta coefficients
+- The [beta values notebook]([url](https://github.com/mjplacroix/seeking-thunder/blob/main/beta_values_bupd.ipynb)) contains similar content with additional visuals
+- The [portfolio strategy notebook](https://github.com/mjplacroix/seeking-thunder/blob/main/portfolio-strategy.ipynb) walks through the performance of our strategy and contains visuals
+- [Data folder](https://github.com/mjplacroix/seeking-thunder/tree/main/data) contains the raw data and beta coefficients
+
+# Seeking Thunder - Overview
 B.  Baharinezhad, S. Johnson, M. LaCroix, A. Patil, J. Pfeffer, 
 
 ## Introduction
